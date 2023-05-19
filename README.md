@@ -2,7 +2,7 @@
 
 [![Actions Status](https://github.com/veyurievna/frontend-project-11/workflows/hexlet-check/badge.svg)](https://github.com/veyurievna/frontend-project-11/actions)
 [![github action status](https://github.com/hexlet-boilerplates/webpack-package/workflows/Node%20CI/badge.svg)](https://github.com/hexlet-boilerplates/webpack-package/actions)
-[![Maintainability](https://api.codeclimate.com/v1/badges/3e14e038eb2092a5a25d/maintainability)](https://codeclimate.com/github/Lena05k/frontend-project-11/maintainability)
+[![Maintainability](https://api.codeclimate.com/v1/badges/3e14e038eb2092a5a25d/maintainability)](https://codeclimate.com/github/veyurievna/frontend-project-11/maintainability)
 
 ### Description
 Simple feed aggregator, which collect RSS feeds and then watched for a new posts.
