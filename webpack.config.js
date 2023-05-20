@@ -1,7 +1,7 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
-export default {
+module.exports = {
   entry: './src/index.js',
   mode: process.env.NODE_ENV || 'development',
   module: {
@@ -33,7 +33,6 @@ export default {
   output: {
     clean: true,
   },
-
   devServer: {
     open: true,
     host: 'localhost',
