@@ -38,10 +38,12 @@ const updatePosts = (watchedState) => {
     const newPosts = posts.filter((post) => !displayedPostLinks.includes(post.link));
     addIds(newPosts, feed.id);
     watchedState.posts.unshift(...newPosts);
-    // return newPosts;
+  })
+  .catch((error) => {
+    console.error(error);
   }));
 
-  return Promise.all(promises).then(() => setTimeout(updatePosts, 5000, watchedState));
+  return Promise.allSettled(promises).then(() => setTimeout(updatePosts, 5000, watchedState));
 };
 
 const handleError = (error) => {
