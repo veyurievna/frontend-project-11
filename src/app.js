@@ -39,9 +39,9 @@ const updatePosts = (watchedState) => {
     addIds(newPosts, feed.id);
     watchedState.posts.unshift(...newPosts);
   })
-  .catch((error) => {
-    console.error(error);
-  }));
+    .catch((error) => {
+      console.error(error);
+    }));
 
   return Promise.allSettled(promises).then(() => setTimeout(updatePosts, 5000, watchedState));
 };
