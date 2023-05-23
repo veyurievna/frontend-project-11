@@ -105,37 +105,28 @@ const app = () => {
         .url()
         .notOneOf(validatedLinks);
 
-        const validateUrl = (input, validatedLinks) => {
-          const schema = makeSchema(validatedLinks);
-          return schema.validate(input)
-            .then(() => null)
-            .catch((error) => handleError(error));
-        };
-        
-        elements.form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const addedLinks = watchedState.feeds.map((feed) => feed.link);
-          const formData = new FormData(e.target);
-          const input = formData.get('url');
-          validateUrl(input, addedLinks)
-            .then((error) => {
-              watchedState.error = error;
-              if (error) {
-                watchedState.formState = 'invalid';
-                return;
-              }
-              watchedState.error = null;
-              watchedState.formState = 'sending';
-              return getData(input);
-            })
-            .then((response) => {
-              if (response) {
-                const data = parse(response.data.contents, input);
-                handleData(data, watchedState);
-                watchedState.formState = 'added';
-              }
-            });
-        });
+      elements.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const addedLinks = watchedState.feeds.map((feed) => feed.link);
+        const schema = makeSchema(addedLinks);
+        const formData = new FormData(e.target);
+        const input = formData.get('url');
+        schema.validate(input)
+          .then(() => {
+            watchedState.error = null;
+            watchedState.formState = 'sending';
+            return getData(input);
+          })
+          .then((response) => {
+            const data = parse(response.data.contents, input);
+            handleData(data, watchedState);
+            watchedState.formState = 'added';
+          })
+          .catch((error) => {
+            watchedState.formState = 'invalid';
+            watchedState.error = handleError(error);
+          });
+      });
 
       elements.postsList.addEventListener('click', (event) => {
         const currentPost = watchedState.posts.find((post) => post.id === event.target.dataset.id);
