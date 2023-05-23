@@ -58,7 +58,7 @@ const handleError = (error) => {
   return error.message.key ?? 'unknown';
 };
 
-const app = () => {
+function app() {
   yup.setLocale({
     string: {
       url: () => ({ key: 'notUrl' }),
@@ -107,16 +107,13 @@ const app = () => {
 
       elements.form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const addedLinks = watchedState.feeds.map((feed) => feed.link);
-        const schema = makeSchema(addedLinks);
-        const formData = new FormData(e.target);
-        const input = formData.get('url');
-        schema.validate(input)
-          .then(() => {
-            watchedState.error = null;
-            watchedState.formState = 'sending';
-            return getData(input);
-          })
+        const input = e.target.querySelector('input').value.trim();
+        handleFormSubmit(watchedState, input);
+      });
+      const handleFormSubmit = (watchedState, input) => {
+        watchedState.error = null;
+        watchedState.formState = 'sending';
+        getData(input)
           .then((response) => {
             const data = parse(response.data.contents, input);
             handleData(data, watchedState);
@@ -126,18 +123,19 @@ const app = () => {
             watchedState.formState = 'invalid';
             watchedState.error = handleError(error);
           });
-      });
-
-      elements.postsList.addEventListener('click', (event) => {
-        const currentPost = watchedState.posts.find((post) => post.id === event.target.dataset.id);
-        if (currentPost) {
-          watchedState.uiState.viewedPostIds.add(currentPost.id);
-          watchedState.uiState.displayedPost = currentPost;
-        }
-      });
-
-      updatePosts(watchedState);
+      };
     });
+
+
+  elements.postsList.addEventListener('click', (event) => {
+    const currentPost = watchedState.posts.find((post) => post.id === event.target.dataset.id);
+    if (currentPost) {
+      watchedState.uiState.viewedPostIds.add(currentPost.id);
+      watchedState.uiState.displayedPost = currentPost;
+    }
+  });
+
+  updatePosts(watchedState);
 };
 
 export default app;
