@@ -4,58 +4,46 @@ import axios from 'axios';
 import i18next from 'i18next';
 import { uniqueId } from 'lodash';
 import render from './render.js';
+import parse from './rss.js';
 import resources from './locales';
-
-const validateLink = (validatedLinks) => yup.string()
-  .required()
-  .url()
-  .notOneOf(validatedLinks);
 
 const getData = (url) => {
   const proxyUrl = new URL('/get', 'https://allorigins.hexlet.app');
   proxyUrl.searchParams.append('disableCache', 'true');
   proxyUrl.searchParams.append('url', url);
-  return axios.get(proxyUrl)
-    .then((response) => response.data.contents);
+  return axios.get(proxyUrl);
 };
 
 const addIds = (posts, feedId) => {
-  return posts.map((post) => ({
-    ...post,
-    id: uniqueId(),
-    feedId,
-  }));
+  posts.forEach((post) => {
+    post.id = uniqueId();
+    post.feedId = feedId;
+  });
 };
 
 const handleData = (data, watchedState) => {
   const { feed, posts } = data;
-  const newFeed = {
-    ...feed,
-    id: uniqueId(),
-  };
-  const newPosts = addIds(posts, newFeed.id);
-  watchedState.feeds.push(newFeed);
-  watchedState.posts.push(...newPosts);
+  feed.id = uniqueId();
+  watchedState.feeds.push(feed);
+  addIds(posts, feed.id);
+  watchedState.posts.push(...posts);
 };
 
 const updatePosts = (watchedState) => {
-  const promises = watchedState.feeds.map((feed) => {
-    const lastPost = watchedState.posts.find((post) => post.feedId === feed.id);
-    const url = lastPost ? `${feed.link}&after=${lastPost.pubDate.toISOString()}` : feed.link;
-    return getData(url)
-      .then((data) => {
-        const { posts } = parse(data, feed.link);
-        const displayedPostLinks = watchedState.posts.map((post) => post.link);
-        const newPosts = addIds(posts.filter((post) => !displayedPostLinks.includes(post.link)), feed.id);
-        watchedState.posts.unshift(...newPosts);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  });
+  const promises = watchedState.feeds.map((feed) => getData(feed.link).then((response) => {
+    const { posts } = parse(response.data.contents);
+    const postsFromState = watchedState.posts;
+    const postsWithCurrentId = postsFromState.filter((post) => post.feedId === feed.id);
+    const displayedPostLinks = postsWithCurrentId.map((post) => post.link);
+    const newPosts = posts.filter((post) => !displayedPostLinks.includes(post.link));
+    addIds(newPosts, feed.id);
+    watchedState.posts.unshift(...newPosts);
+  })
+    .catch((error) => {
+      console.error(error);
+    }));
 
-  return Promise.allSettled(promises)
-    .then(() => setTimeout(updatePosts, 5000, watchedState));
+  return Promise.allSettled(promises).then(() => setTimeout(updatePosts, 5000, watchedState));
 };
 
 const handleError = (error) => {
@@ -70,14 +58,24 @@ const handleError = (error) => {
   return error.message.key ?? 'unknown';
 };
 
-function app() {
+const app = () => {
+  yup.setLocale({
+    string: {
+      url: () => ({ key: 'notUrl' }),
+      required: () => ({ key: 'empty' }),
+    },
+    mixed: {
+      notOneOf: () => ({ key: 'alreadyInList' }),
+    },
+  });
+
   const state = {
     formState: 'filling',
     error: null,
     feeds: [],
     posts: [],
     uiState: {
-      displayedPostId: null,
+      displayedPost: null,
       viewedPostIds: new Set(),
     },
   };
@@ -94,47 +92,61 @@ function app() {
     modalHref: document.querySelector('.full-article'),
   };
 
-  const i18nextInstance = i18next.createInstance({ lng: 'ru', debug: false, resources });
-  i18nextInstance.init()
+  const i18nextInstance = i18next.createInstance();
+  i18nextInstance.init({
+    lng: 'ru',
+    debug: false,
+    resources,
+  })
     .then(() => {
       const watchedState = onChange(state, render(state, elements, i18nextInstance));
+      const makeSchema = (validatedLinks) => yup.string()
+        .required()
+        .url()
+        .notOneOf(validatedLinks);
 
-      const handleFormSubmit = () => {
-        const input = elements.urlInput.value.trim();
-        const validatedLinks = watchedState.feeds.map((feed) => feed.link);
-        const schema = validateLink(validatedLinks);
-        schema.validate(input)
-          .then(() => {
-            watchedState.error = null;
-            watchedState.formState = 'sending';
-            return getData(input);
-          })
-          .then((data) => {
-            handleData(parse(data, input), watchedState);
-            watchedState.formState = 'added';
-          })
-          .catch((error) => {
-            watchedState.formState = 'invalid';
-            watchedState.error = handleError(error);
-          });
-      };
+        const validateUrl = (input, validatedLinks) => {
+          const schema = makeSchema(validatedLinks);
+          return schema.validate(input)
+            .then(() => null)
+            .catch((error) => handleError(error));
+        };
+        
+        elements.form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const addedLinks = watchedState.feeds.map((feed) => feed.link);
+          const formData = new FormData(e.target);
+          const input = formData.get('url');
+          validateUrl(input, addedLinks)
+            .then((error) => {
+              watchedState.error = error;
+              if (error) {
+                watchedState.formState = 'invalid';
+                return;
+              }
+              watchedState.error = null;
+              watchedState.formState = 'sending';
+              return getData(input);
+            })
+            .then((response) => {
+              if (response) {
+                const data = parse(response.data.contents, input);
+                handleData(data, watchedState);
+                watchedState.formState = 'added';
+              }
+            });
+        });
 
-      elements.form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        handleFormSubmit();
+      elements.postsList.addEventListener('click', (event) => {
+        const currentPost = watchedState.posts.find((post) => post.id === event.target.dataset.id);
+        if (currentPost) {
+          watchedState.uiState.viewedPostIds.add(currentPost.id);
+          watchedState.uiState.displayedPost = currentPost;
+        }
       });
+
+      updatePosts(watchedState);
     });
-
-  elements.postsList.addEventListener('click', (event) => {
-    const post = watchedState.posts.find((p) => p.id === event.target.dataset.id);
-    if (!post) {
-      return;
-    }
-    watchedState.uiState.viewedPostIds.add(post.id);
-    watchedState.uiState.displayedPostId = post.id;
-  });
-
-  updatePosts(state);
 };
 
 export default app;
